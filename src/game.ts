@@ -17,7 +17,9 @@ export const schedulers: Record<SchedulerId, () => Scheduler> = {
 };
 
 const schedulerIds = Object.keys(schedulers) as SchedulerId[];
-const periods = [4, 6, 8, 12];
+const periods = [4, 5, 6, 8, 10, 12];
+const minPuzzleUtilization = 0.72;
+const maxPuzzleUtilization = 0.95;
 
 export function schedulerName(schedulerId: SchedulerId) {
     return schedulers[schedulerId]().name;
@@ -29,7 +31,7 @@ export function createRandomPuzzleState(): PuzzleState {
         const tasks = createRandomTasks();
         const schedule = schedulers[scheduler]().schedule(tasks);
 
-        if (isValidSchedule(tasks, schedule)) {
+        if (utilization(tasks) >= minPuzzleUtilization && isValidSchedule(tasks, schedule)) {
             return { scheduler, tasks };
         }
     }
@@ -37,8 +39,9 @@ export function createRandomPuzzleState(): PuzzleState {
     return {
         scheduler: "earliest-deadline-first",
         tasks: [
-            { id: 1, name: "Task 1", worst_case_execution_time: 1, period: 4, deadline: 4 },
-            { id: 2, name: "Task 2", worst_case_execution_time: 1, period: 6, deadline: 6 },
+            { id: 1, name: "Task 1", worst_case_execution_time: 2, period: 6, deadline: 6 },
+            { id: 2, name: "Task 2", worst_case_execution_time: 2, period: 8, deadline: 8 },
+            { id: 3, name: "Task 3", worst_case_execution_time: 3, period: 12, deadline: 12 },
         ],
     };
 }
@@ -137,29 +140,30 @@ export function isValidSchedule(tasks: ReadonlyArray<Readonly<Task>>, schedule: 
 }
 
 function createRandomTasks() {
-    const taskCount = randomInt(2, 4);
-    const availablePeriods = shuffle(periods).slice(0, taskCount).toSorted((left, right) => left - right);
-    const tasks: Task[] = [];
+    const taskCount = randomInt(3, 5);
+    const availablePeriods = shuffle(periods).slice(0, taskCount);
+    const targetUtilization = randomFloat(minPuzzleUtilization, maxPuzzleUtilization);
+    const weights = Array.from({ length: taskCount }, () => randomFloat(0.7, 1.6));
+    const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
+    const tasks = availablePeriods.map((period, index) => {
+        const weightedUtilization = targetUtilization * (weights[index] / totalWeight);
+        const baseTime = Math.round(weightedUtilization * period);
+        const worstCaseExecutionTime = Math.min(period - 1, Math.max(1, baseTime));
 
-    for (let index = 0; index < taskCount; index += 1) {
-        const period = availablePeriods[index];
-        const currentUtilization = tasks.reduce(
-            (sum, task) => sum + task.worst_case_execution_time / task.period,
-            0,
-        );
-        const remainingBudget = Math.max(1, Math.floor((0.9 - currentUtilization) * period));
-        const worstCaseExecutionTime = randomInt(1, Math.min(3, remainingBudget, period - 1));
-
-        tasks.push({
+        return {
             id: index + 1,
             name: `Task ${index + 1}`,
             worst_case_execution_time: worstCaseExecutionTime,
             period,
             deadline: period,
-        });
-    }
+        };
+    });
 
-    return tasks;
+    return shuffle(tasks).map((task, index) => ({
+        ...task,
+        id: index + 1,
+        name: `Task ${index + 1}`,
+    }));
 }
 
 function isPuzzleState(value: PuzzleState): value is PuzzleState {
@@ -168,8 +172,8 @@ function isPuzzleState(value: PuzzleState): value is PuzzleState {
         value !== null &&
         schedulerIds.includes(value.scheduler) &&
         Array.isArray(value.tasks) &&
-        value.tasks.length >= 2 &&
-        value.tasks.length <= 4 &&
+        value.tasks.length >= 3 &&
+        value.tasks.length <= 5 &&
         value.tasks.every(isTask)
     );
 }
@@ -221,6 +225,14 @@ function randomInt(min: number, max: number) {
     return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+function randomFloat(min: number, max: number) {
+    return Math.random() * (max - min) + min;
+}
+
 function shuffle<T>(values: T[]) {
     return [...values].sort(() => Math.random() - 0.5);
+}
+
+function utilization(tasks: ReadonlyArray<Readonly<Task>>) {
+    return tasks.reduce((sum, task) => sum + task.worst_case_execution_time / task.period, 0);
 }

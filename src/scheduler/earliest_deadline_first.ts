@@ -10,6 +10,7 @@ export class EarliestDeadlineFirstScheduler implements Scheduler {
                 readyJobs.toSorted(
                     (a, b) =>
                         a.absoluteDeadline - b.absoluteDeadline ||
+                        a.task.period - b.task.period ||
                         a.releaseTime - b.releaseTime ||
                         a.task.id - b.task.id
                 )[0]

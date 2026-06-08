@@ -1,6 +1,6 @@
 <script lang="ts">
     import { EditableSchedule, type EditableScheduleEntry } from "./EditableSchedule.svelte";
-    import type { Task } from "./scheduler/interface";
+    import type { Schedule, Task } from "./scheduler/interface";
 
     type Marker = {
         id: string;
@@ -14,7 +14,18 @@
         markers: Marker[];
     };
 
-    const { tasks }: { tasks: Task[] } = $props();
+    type SolutionBlock = {
+        taskId: number;
+        start: number;
+        end: number;
+        time: number;
+    };
+
+    const {
+        tasks,
+        solution,
+        onSubmit,
+    }: { tasks: Task[]; solution?: Schedule; onSubmit?: (schedule: Schedule) => void } = $props();
     const schedule = new EditableSchedule();
 
     type Interaction =
@@ -40,6 +51,8 @@
               entryStart: number;
               entryEnd: number;
               track: HTMLElement;
+              mergedStart?: number;
+              mergedEnd?: number;
           };
 
     let activeInteraction = $state<Interaction | undefined>();
@@ -101,6 +114,35 @@
             return { task, markers };
         }),
     );
+
+    const solutionBlocks = $derived.by(() => {
+        if (!solution) {
+            return [];
+        }
+
+        const blocks: SolutionBlock[] = [];
+        let start = 0;
+
+        for (const entry of solution.entries) {
+            const end = start + entry.allocatedTime;
+
+            if (entry.taskId !== undefined && entry.allocatedTime > 0) {
+                blocks.push({
+                    taskId: entry.taskId,
+                    start,
+                    end,
+                    time: entry.allocatedTime,
+                });
+            }
+
+            start = end;
+        }
+
+        return blocks;
+    });
+
+    const solutionBlocksForTask = (taskId: number) =>
+        solutionBlocks.filter((entry) => entry.taskId === taskId);
 
     $effect(() => {
         schedule.setQuanta(timelineQuanta);
@@ -198,17 +240,46 @@
         if (activeInteraction.kind === "move") {
             schedule.moveEntry(activeInteraction.entry, activeInteraction.entryStart + delta, direction);
         } else if (activeInteraction.kind === "resize-start") {
+            const rawStart = activeInteraction.entryStart + delta;
+            const rawEnd = activeInteraction.entryEnd;
+            const start = Math.min(rawStart, rawEnd, activeInteraction.mergedStart ?? rawStart);
+            const end = Math.max(rawStart, rawEnd, activeInteraction.mergedEnd ?? rawEnd);
+
             schedule.setEntryRange(
                 activeInteraction.entry,
-                activeInteraction.entryStart + delta,
-                activeInteraction.entryEnd,
+                start,
+                end,
             );
         } else {
+            const rawStart = activeInteraction.entryStart;
+            const rawEnd = activeInteraction.entryEnd + delta;
+            const start = Math.min(rawStart, rawEnd, activeInteraction.mergedStart ?? rawStart);
+            const end = Math.max(rawStart, rawEnd, activeInteraction.mergedEnd ?? rawEnd);
+
             schedule.setEntryRange(
                 activeInteraction.entry,
-                activeInteraction.entryStart,
-                activeInteraction.entryEnd + delta,
+                start,
+                end,
             );
+        }
+
+        if (
+            activeInteraction.kind === "resize-start" ||
+            activeInteraction.kind === "resize-end"
+        ) {
+            const currentStart =
+                activeInteraction.kind === "resize-start"
+                    ? Math.min(activeInteraction.entryStart + delta, activeInteraction.entryEnd)
+                    : Math.min(activeInteraction.entryStart, activeInteraction.entryEnd + delta);
+            const currentEnd =
+                activeInteraction.kind === "resize-start"
+                    ? Math.max(activeInteraction.entryStart + delta, activeInteraction.entryEnd)
+                    : Math.max(activeInteraction.entryStart, activeInteraction.entryEnd + delta);
+
+            if (activeInteraction.entry.start < currentStart || activeInteraction.entry.end > currentEnd) {
+                activeInteraction.mergedStart = activeInteraction.entry.start;
+                activeInteraction.mergedEnd = activeInteraction.entry.end;
+            }
         }
     };
 
@@ -218,6 +289,14 @@
         }
 
         activeInteraction = undefined;
+    };
+
+    const handleSubmit = () => {
+        schedule.finalizeEdit();
+        onSubmit?.({
+            entries: schedule.entries,
+            quanta: schedule.quanta,
+        });
     };
 </script>
 
@@ -254,6 +333,7 @@
 
             <div
                 class="track"
+                class:with-solution={solution !== undefined}
                 role="button"
                 tabindex="0"
                 data-testid="schedule-track"
@@ -295,6 +375,22 @@
                     </button>
                 {/each}
 
+                {#each solutionBlocksForTask(track.task.id) as entry}
+                    <span
+                        class="solution-entry"
+                        data-testid="solution-entry"
+                        data-task-id={track.task.id}
+                        data-start={entry.start}
+                        data-end={entry.end}
+                        data-time={entry.time}
+                        style={`left: ${(entry.start / timelineQuanta) * 100}%; width: ${(entry.time / timelineQuanta) * 100}%;`}
+                        aria-label={`${track.task.name} solution from ${entry.start} to ${entry.end}`}
+                        title={`${track.task.name} solution: ${entry.start}-${entry.end}`}
+                    >
+                        {entry.start}-{entry.end}
+                    </span>
+                {/each}
+
                 {#each track.markers as marker}
                     <span
                         class="marker {marker.kind}"
@@ -311,6 +407,13 @@
         <span><i class="release-key"></i>Release</span>
         <span><i class="deadline-key"></i>Deadline</span>
         <span><i class="entry-key"></i>Scheduled</span>
+        {#if solution}
+            <span><i class="solution-key"></i>Solution</span>
+        {/if}
+    </div>
+
+    <div class="editor-actions">
+        <button type="button" data-testid="submit-schedule" onclick={handleSubmit}>Submit Schedule</button>
     </div>
 </section>
 
@@ -427,6 +530,10 @@
         user-select: none;
     }
 
+    .track.with-solution {
+        min-height: 92px;
+    }
+
     .quantum-grid {
         display: grid;
         height: 100%;
@@ -472,6 +579,28 @@
         box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
         cursor: grab;
         font: 12px/1 var(--mono);
+    }
+
+    .solution-entry {
+        position: absolute;
+        right: auto;
+        bottom: 12px;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 18px;
+        overflow: hidden;
+        box-sizing: border-box;
+        padding: 0 3px;
+        border: 1px dashed #1f7a5a;
+        border-radius: 6px;
+        color: var(--text-h);
+        background: color-mix(in srgb, #1f7a5a, transparent 84%);
+        font: 12px/1 var(--mono);
+        pointer-events: none;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .schedule-entry:active {
@@ -560,6 +689,31 @@
         background: var(--accent);
     }
 
+    .solution-key {
+        border-top: 2px dashed #1f7a5a;
+    }
+
+    .editor-actions {
+        display: flex;
+        justify-content: flex-end;
+        margin: 18px 24px 0;
+    }
+
+    .editor-actions button {
+        border: 1px solid var(--accent-border);
+        border-radius: 6px;
+        padding: 9px 14px;
+        color: var(--text-h);
+        background: var(--accent-bg);
+        font: 600 14px/1 var(--sans);
+        cursor: pointer;
+    }
+
+    .editor-actions button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+
     @media (max-width: 720px) {
         .schedule-editor {
             margin-bottom: 32px;
@@ -576,6 +730,10 @@
 
         .track-label {
             padding-inline: 12px;
+        }
+
+        .editor-actions {
+            margin-inline: 16px;
         }
     }
 </style>

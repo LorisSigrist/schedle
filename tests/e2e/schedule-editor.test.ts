@@ -1,12 +1,13 @@
 import { test } from '@playwright/test'
 import { ScheduleEditor } from './pom/ScheduleEditor';
+import { puzzleUrl } from './puzzle-fixture';
 
 
 test.describe("Schedule Editor", () => {
     let editor: ScheduleEditor;
 
     test.beforeEach(async ({ page }) => {
-        await page.goto('/');
+        await page.goto(puzzleUrl);
         editor = new ScheduleEditor(page);
     });
 
@@ -100,6 +101,29 @@ test.describe("Schedule Editor", () => {
         ]);
     });
 
+    test("moves an entry by dragging the body of the range", async () => {
+        await editor.addEntry(1, 2, 5);
+        const entry = editor.getEntry(1, 2);
+
+        await editor.dragEntry(entry, 3);
+
+        await editor.expectEntries([{ taskId: 1, start: 5, time: 5 }]);
+    });
+
+    test("splits an overlapping task when moving an entry through it", async () => {
+        await editor.addEntry(1, 0, 10);
+        await editor.addEntry(2, 10, 2);
+        const entry = editor.getEntry(2, 10);
+
+        await editor.dragEntry(entry, -5);
+
+        await editor.expectEntries([
+            { taskId: 1, start: 0, time: 5 },
+            { taskId: 1, start: 7, time: 3 },
+            { taskId: 2, start: 5, time: 2 },
+        ]);
+    });
+
     test("deletes an entry when dragging the end handle onto the start handle", async () => {
         await editor.addEntry(1, 2, 5);
         const entry = editor.getEntry(1, 2);
@@ -134,6 +158,36 @@ test.describe("Schedule Editor", () => {
         await editor.dragEntryStartHandle(entry, 8);
 
         await editor.expectEntries([{ taskId: 1, start: 7, time: 3 }]);
+    });
+
+    test("keeps a following same-task range when flipping the start handle into it", async () => {
+        await editor.addEntry(1, 2, 5);
+        await editor.addEntry(1, 10, 3);
+        const entry = editor.getEntry(1, 2);
+
+        await editor.dragEntryStartHandleWithoutRelease(entry, 10);
+        await editor.expectEntries([{ taskId: 1, start: 7, time: 6 }]);
+
+        await editor.moveHeldPointerToQuantum(1, 12);
+        await editor.expectEntries([{ taskId: 1, start: 7, time: 6 }]);
+
+        await editor.releaseMouse();
+        await editor.expectEntries([{ taskId: 1, start: 7, time: 6 }]);
+    });
+
+    test("keeps a preceding same-task range when flipping the end handle into it", async () => {
+        await editor.addEntry(1, 0, 3);
+        await editor.addEntry(1, 5, 5);
+        const entry = editor.getEntry(1, 5);
+
+        await editor.dragEntryEndHandleWithoutRelease(entry, -8);
+        await editor.expectEntries([{ taskId: 1, start: 0, time: 5 }]);
+
+        await editor.moveHeldPointerToQuantum(1, 2);
+        await editor.expectEntries([{ taskId: 1, start: 0, time: 5 }]);
+
+        await editor.releaseMouse();
+        await editor.expectEntries([{ taskId: 1, start: 0, time: 5 }]);
     });
 
 });

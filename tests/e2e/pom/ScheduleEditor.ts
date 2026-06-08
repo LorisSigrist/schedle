@@ -78,15 +78,51 @@ export class ScheduleEditor {
     }
 
     async dragEntryEndHandle(entry: Locator, offset: number) {
-        await this.dragEntryHandle(entry, ".resize-handle.end", await this.offsetPastBlockers(entry, offset, "end"));
+        await this.dragEntryEndHandleWithoutRelease(entry, offset);
+        await this.releaseMouse();
     }
 
     async dragEntryStartHandle(entry: Locator, offset: number) {
-        await this.dragEntryHandle(
+        await this.dragEntryStartHandleWithoutRelease(entry, offset);
+        await this.releaseMouse();
+    }
+
+    async dragEntryEndHandleWithoutRelease(entry: Locator, offset: number) {
+        await this.dragEntryHandleWithoutRelease(
+            entry,
+            ".resize-handle.end",
+            await this.offsetPastBlockers(entry, offset, "end"),
+        );
+    }
+
+    async dragEntryStartHandleWithoutRelease(entry: Locator, offset: number) {
+        await this.dragEntryHandleWithoutRelease(
             entry,
             ".resize-handle.start",
             await this.offsetPastBlockers(entry, offset, "start"),
         );
+    }
+
+    async dragEntry(entry: Locator, offset: number) {
+        await this.dragEntryWithoutRelease(entry, offset);
+        await this.releaseMouse();
+    }
+
+    async dragEntryWithoutRelease(entry: Locator, offset: number) {
+        const entryBox = await entry.boundingBox();
+
+        if (!entryBox) {
+            throw new Error("Could not locate schedule entry");
+        }
+
+        const track = this.trackForEntry(entry);
+        const quantumWidth = await this.quantumWidth(track);
+        const startX = entryBox.x + entryBox.width / 2;
+        const y = entryBox.y + entryBox.height / 2;
+
+        await this.page.mouse.move(startX, y);
+        await this.page.mouse.down();
+        await this.page.mouse.move(startX + offset * quantumWidth, y);
     }
 
     /**
@@ -115,7 +151,7 @@ export class ScheduleEditor {
         return this.page.locator(`[data-testid="schedule-track"][data-task-id="${taskId}"]`);
     }
 
-    private async dragEntryHandle(entry: Locator, handleSelector: string, offset: number) {
+    private async dragEntryHandleWithoutRelease(entry: Locator, handleSelector: string, offset: number) {
         const handle = entry.locator(handleSelector);
         const handleBox = await handle.boundingBox();
 
@@ -131,7 +167,6 @@ export class ScheduleEditor {
         await this.page.mouse.move(startX, y);
         await this.page.mouse.down();
         await this.page.mouse.move(startX + offset * quantumWidth, y);
-        await this.page.mouse.up();
     }
 
     private async offsetPastBlockers(entry: Locator, offset: number, edge: "start" | "end") {
