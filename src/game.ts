@@ -1,9 +1,8 @@
 import type { Schedule, ScheduleEntry, Scheduler, Task } from "./scheduler/interface";
 import { EarliestDeadlineFirstScheduler } from "./scheduler/earliest_deadline_first";
 import { RateMonotonicScheduler } from "./scheduler/rate_monotonic";
-import { RoundRobinScheduler } from "./scheduler/round_robin";
 
-export type SchedulerId = "rate-monotonic" | "earliest-deadline-first" | "round-robin";
+export type SchedulerId = "rate-monotonic" | "earliest-deadline-first";
 
 export type PuzzleState = {
     scheduler: SchedulerId;
@@ -13,7 +12,6 @@ export type PuzzleState = {
 export const schedulers: Record<SchedulerId, () => Scheduler> = {
     "rate-monotonic": () => new RateMonotonicScheduler(),
     "earliest-deadline-first": () => new EarliestDeadlineFirstScheduler(),
-    "round-robin": () => new RoundRobinScheduler(),
 };
 
 const schedulerIds = Object.keys(schedulers) as SchedulerId[];
