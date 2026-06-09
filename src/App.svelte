@@ -4,6 +4,7 @@
         createRandomPuzzleState,
         decodePuzzleState,
         encodePuzzleState,
+        scheduleMatchesEnteredPrefix,
         schedulerName,
         schedulesEqual,
         solutionForPuzzle,
@@ -11,7 +12,7 @@
     } from "./game";
     import type { Schedule } from "./scheduler/interface";
 
-    type Result = "correct" | "incorrect" | undefined;
+    type Result = "correct" | "on-track" | "incorrect" | undefined;
 
     const puzzleQueryParam = "puzzle";
 
@@ -36,7 +37,16 @@
     }
 
     function handleSubmit(schedule: Schedule) {
-        result = schedulesEqual(schedule, solutionForPuzzle(puzzle)) ? "correct" : "incorrect";
+        const solution = solutionForPuzzle(puzzle);
+
+        if (schedulesEqual(schedule, solution)) {
+            result = "correct";
+        } else if (scheduleMatchesEnteredPrefix(schedule, solution)) {
+            result = "on-track";
+        } else {
+            result = "incorrect";
+        }
+
         showSolution = false;
     }
 
@@ -66,9 +76,20 @@
     </section>
 
     {#if result}
-        <section class="round-result" class:correct={result === "correct"} data-testid="round-result">
+        <section
+            class="round-result"
+            class:correct={result === "correct"}
+            class:on-track={result === "on-track"}
+            data-testid="round-result"
+        >
             <p>
-                {result === "correct" ? "Correct schedule." : "That schedule does not match the selected algorithm."}
+                {#if result === "correct"}
+                    Correct schedule.
+                {:else if result === "on-track"}
+                    You're on the right track.
+                {:else}
+                    That schedule does not match the selected algorithm.
+                {/if}
             </p>
             {#if result === "incorrect"}
                 <button type="button" data-testid="show-solution" onclick={() => (showSolution = true)}>
@@ -154,6 +175,11 @@
     .round-result.correct {
         border-color: #1f7a5a;
         background: color-mix(in srgb, #1f7a5a, transparent 90%);
+    }
+
+    .round-result.on-track {
+        border-color: #8a6a00;
+        background: color-mix(in srgb, #8a6a00, transparent 90%);
     }
 
     .round-result button {

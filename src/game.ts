@@ -89,6 +89,24 @@ export function schedulesEqual(left: Schedule, right: Schedule) {
     );
 }
 
+export function scheduleMatchesEnteredPrefix(left: Schedule, right: Schedule) {
+    const leftTimeline = expandSchedule(left);
+    const rightTimeline = expandSchedule(right);
+    let prefixLength = leftTimeline.length;
+
+    while (prefixLength > 0 && leftTimeline[prefixLength - 1] === undefined) {
+        prefixLength -= 1;
+    }
+
+    return (
+        prefixLength > 0 &&
+        prefixLength <= rightTimeline.length &&
+        leftTimeline
+            .slice(0, prefixLength)
+            .every((taskId, index) => taskId === rightTimeline[index])
+    );
+}
+
 export function isValidSchedule(tasks: ReadonlyArray<Readonly<Task>>, schedule: Schedule) {
     const timeline = expandSchedule(schedule);
 
