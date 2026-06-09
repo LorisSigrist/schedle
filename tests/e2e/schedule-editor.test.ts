@@ -91,6 +91,12 @@ test.describe("Schedule Editor", () => {
         ]);
     });
 
+    test("clicking the right half of a quantum places the entry in that quantum", async () => {
+        await editor.clickQuantumAtOffset(1, 5, 0.75);
+
+        await editor.expectEntries([{ taskId: 1, start: 5, time: 1 }]);
+    });
+
     test("trims other tasks entry when dragging an entry's end handle past it", async () => {
         await editor.addEntry(1, 0, 10);
         await editor.addEntry(2, 5, 5);

@@ -45,6 +45,16 @@ export class ScheduleEditor {
         await this.releaseMouse();
     }
 
+    async clickQuantumAtOffset(taskId: number, quantum: number, offset: number) {
+        const track = this.getTrack(taskId);
+        const x = (await this.quantumX(track, quantum)) + (await this.quantumWidth(track)) * offset;
+        const y = await this.trackCenterY(track);
+
+        await this.page.mouse.move(x, y);
+        await this.page.mouse.down();
+        await this.releaseMouse();
+    }
+
     async mouseDownAtQuantum(taskId: number, quantum: number) {
         const track = this.getTrack(taskId);
         const x = await this.quantumX(track, quantum);

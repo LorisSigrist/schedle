@@ -148,11 +148,22 @@
         schedule.setQuanta(timelineQuanta);
     });
 
-    const quantumFromPointer = (event: PointerEvent, element: HTMLElement) => {
+    const pointerProgress = (event: PointerEvent, element: HTMLElement) => {
         const rect = element.getBoundingClientRect();
-        const progress = (event.clientX - rect.left) / rect.width;
 
-        return Math.min(timelineQuanta, Math.max(0, Math.round(progress * timelineQuanta)));
+        return (event.clientX - rect.left) / rect.width;
+    };
+
+    const quantumBoundaryFromPointer = (event: PointerEvent, element: HTMLElement) => {
+        const quantum = Math.round(pointerProgress(event, element) * timelineQuanta);
+
+        return Math.min(timelineQuanta, Math.max(0, quantum));
+    };
+
+    const quantumCellFromPointer = (event: PointerEvent, element: HTMLElement) => {
+        const quantum = Math.floor(pointerProgress(event, element) * timelineQuanta);
+
+        return Math.min(timelineQuanta - 1, Math.max(0, quantum));
     };
 
     const interactionDirection = (currentQuantum: number, pointerStartQuantum: number) =>
@@ -163,7 +174,7 @@
             return;
         }
 
-        const startQuantum = quantumFromPointer(event, event.currentTarget);
+        const startQuantum = quantumCellFromPointer(event, event.currentTarget);
         const entry = schedule.createEntry(task.id, Math.min(startQuantum, timelineQuanta - 1), 1);
 
         activeInteraction = {
@@ -193,7 +204,7 @@
             return;
         }
 
-        const pointerStartQuantum = quantumFromPointer(event, track);
+        const pointerStartQuantum = quantumBoundaryFromPointer(event, track);
 
         activeInteraction = {
             kind,
@@ -210,7 +221,7 @@
             return;
         }
 
-        const currentQuantum = quantumFromPointer(event, activeInteraction.track);
+        const currentQuantum = quantumBoundaryFromPointer(event, activeInteraction.track);
 
         if (activeInteraction.kind === "create") {
             const rawStart = Math.min(activeInteraction.startQuantum, currentQuantum);
@@ -498,9 +509,9 @@
             repeating-linear-gradient(
                 to right,
                 transparent 0,
-                transparent calc(var(--quantum-width) - 1px),
-                var(--border) calc(var(--quantum-width) - 1px),
-                var(--border) var(--quantum-width)
+                transparent calc((100% / var(--quanta)) - 1px),
+                var(--border) calc((100% / var(--quanta)) - 1px),
+                var(--border) calc(100% / var(--quanta))
             ),
             var(--social-bg);
     }
