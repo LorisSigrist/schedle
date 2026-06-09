@@ -13,15 +13,15 @@ export class RoundRobinScheduler implements Scheduler {
             chooseJob: (readyJobs) => {
                 queuedJobs = queuedJobs.filter((job) => readyJobs.includes(job));
 
+                const newJobs = readyJobs
+                    .filter((job) => job !== previouslySelectedJob && !queuedJobs.includes(job))
+                    .toSorted((a, b) => a.releaseTime - b.releaseTime || taskIndex(tasks, a.task.id) - taskIndex(tasks, b.task.id));
+                queuedJobs.push(...newJobs);
+
                 if (previouslySelectedJob && readyJobs.includes(previouslySelectedJob)) {
                     queuedJobs.push(previouslySelectedJob);
                 }
                 previouslySelectedJob = undefined;
-
-                const newJobs = readyJobs
-                    .filter((job) => !queuedJobs.includes(job))
-                    .toSorted((a, b) => a.releaseTime - b.releaseTime || taskIndex(tasks, a.task.id) - taskIndex(tasks, b.task.id));
-                queuedJobs.push(...newJobs);
 
                 const selectedJob = queuedJobs.shift();
                 if (!selectedJob) {

@@ -15,6 +15,18 @@ describe('RoundRobinScheduler', () => {
 
         expect(expandSchedule(schedule)).toEqual([1, 2, 3, 1, 1, 2, 1, undefined]);
     });
+
+    it('switches from the previously running job when another task is released', () => {
+        const scheduler = new RoundRobinScheduler();
+        const tasks: Task[] = [
+            { id: 1, name: 'Short period task', worst_case_execution_time: 1, period: 3, deadline: 3 },
+            { id: 2, name: 'Long running task', worst_case_execution_time: 3, period: 4, deadline: 4 }
+        ];
+
+        const schedule = scheduler.schedule(tasks);
+
+        expect(expandSchedule(schedule).slice(0, 5)).toEqual([1, 2, 2, 1, 2]);
+    });
 });
 
 function expandSchedule(schedule: Schedule): Array<number | undefined> {
