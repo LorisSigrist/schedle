@@ -1,6 +1,6 @@
 import type { Schedule, ScheduleEntry, Task } from './interface.js';
 
-type Job = {
+export type Job = {
     task: Readonly<Task>;
     releaseTime: number;
     absoluteDeadline: number;
