@@ -140,35 +140,11 @@ export class EditableSchedule implements Schedule {
     }
 
     private touchesOrOverlaps(left: EditableScheduleEntry, right: EditableScheduleEntry) {
-        return left.start <= right.end + 1 && right.start <= left.end + 1;
+        return left.start <= right.end && right.start <= left.end;
     }
 
     private canMergeSameTask(left: EditableScheduleEntry, right: EditableScheduleEntry) {
-        if (left.taskId !== right.taskId || !this.touchesOrOverlaps(left, right)) {
-            return false;
-        }
-
-        const first = left.start <= right.start ? left : right;
-        const second = first === left ? right : left;
-        const gapStart = first.end;
-        const gapEnd = second.start;
-
-        if (gapEnd <= gapStart) {
-            return true;
-        }
-
-        const gapIsDiscreteNeighbor = gapEnd - gapStart <= 1;
-        const gapIsBlocked = this.segments.some(
-            (entry) =>
-                entry.id !== left.id &&
-                entry.id !== right.id &&
-                entry.taskId !== left.taskId &&
-                entry.time > 0 &&
-                entry.start < gapEnd &&
-                gapStart < entry.end,
-        );
-
-        return gapIsDiscreteNeighbor && !gapIsBlocked;
+        return left.taskId === right.taskId && this.touchesOrOverlaps(left, right);
     }
 
     private mergeIntoAnchor(anchor: EditableScheduleEntry) {

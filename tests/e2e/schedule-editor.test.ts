@@ -28,10 +28,19 @@ test.describe("Schedule Editor", () => {
         await editor.expectEntries([{ taskId: 1, time: 10 }]);
     });
 
-    test("it merges discrete neighboring ranges when the new entry is placed before the existing one", async () => {
+    test("it merges adjacent ranges when the new entry is placed before the existing one", async () => {
+        await editor.addEntry(1, 5, 5);
+        await editor.addEntry(1, 0, 5);
+        await editor.expectEntries([{ taskId: 1, time: 10 }]);
+    });
+
+    test("it does not merge non-adjacent ranges of the same task", async () => {
         await editor.addEntry(1, 5, 5);
         await editor.addEntry(1, 0, 4);
-        await editor.expectEntries([{ taskId: 1, time: 10 }]);
+        await editor.expectEntries([
+            { taskId: 1, start: 0, time: 4 },
+            { taskId: 1, start: 5, time: 5 },
+        ]);
     });
 
     test("it visually merges adjacent entries before releasing the drag", async () => {
@@ -60,7 +69,7 @@ test.describe("Schedule Editor", () => {
     test("it keeps a leading live merge after releasing the drag", async () => {
         await editor.addEntry(1, 5, 5);
 
-        await editor.dragNewEntryWithoutRelease(1, 0, 4);
+        await editor.dragNewEntryWithoutRelease(1, 0, 5);
         await editor.expectEntries([{ taskId: 1, time: 10 }]);
 
         await editor.moveHeldPointerToQuantum(1, 4);
