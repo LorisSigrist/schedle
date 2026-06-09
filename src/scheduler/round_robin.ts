@@ -1,21 +1,34 @@
 import type { Scheduler, Schedule, Task } from './interface.js';
+import type { Job } from './simulation.js';
 import { simulatePeriodicSchedule } from './simulation.js';
 
 export class RoundRobinScheduler implements Scheduler {
     name = 'Round Robin Scheduler';
 
     schedule(tasks: ReadonlyArray<Readonly<Task>>): Schedule {
-        let nextTaskIndex = 0;
+        let queuedJobs: Job[] = [];
+        let previouslySelectedJob: Job | undefined;
 
         return simulatePeriodicSchedule(tasks, {
             chooseJob: (readyJobs) => {
-                if (readyJobs.length === 0) {
+                queuedJobs = queuedJobs.filter((job) => readyJobs.includes(job));
+
+                if (previouslySelectedJob && readyJobs.includes(previouslySelectedJob)) {
+                    queuedJobs.push(previouslySelectedJob);
+                }
+                previouslySelectedJob = undefined;
+
+                const newJobs = readyJobs
+                    .filter((job) => !queuedJobs.includes(job))
+                    .toSorted((a, b) => a.releaseTime - b.releaseTime || taskIndex(tasks, a.task.id) - taskIndex(tasks, b.task.id));
+                queuedJobs.push(...newJobs);
+
+                const selectedJob = queuedJobs.shift();
+                if (!selectedJob) {
                     return undefined;
                 }
 
-                const selectedJob =
-                    readyJobs.find((job) => taskIndex(tasks, job.task.id) >= nextTaskIndex) ?? readyJobs[0];
-                nextTaskIndex = (taskIndex(tasks, selectedJob.task.id) + 1) % tasks.length;
+                previouslySelectedJob = selectedJob;
 
                 return selectedJob;
             }
